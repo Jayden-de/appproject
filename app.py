@@ -3,15 +3,20 @@ import pandas as pd
 import pydeck as pdk
 
 # 페이지 설정
-st.set_page_config(page_title="주말 인기 따릉이 대여소 대시보드", layout="wide")
+st.set_page_config(page_title="서울시 따릉이 인기 대여소 대시보드", layout="wide")
 
-st.title("🚲 주말 인기 따릉이 대여소 시각화")
-st.markdown("`weekendpopular.csv` 데이터를 기반으로 주말 이용량이 많은 대여소를 지도에 표시합니다.")
+st.title("🚲 따릉이 인기 대여소 시각화")
 
 # 데이터 로드
 @st.cache_data
-def load_data():
-    file_path = 'weekendpopular.csv'
+def load_data(file_type):
+    if file_type == "평일":
+        file_path = 'weekdayspopular.csv'
+        target_col = '평일'
+    else:
+        file_path = 'weekendpopular.csv'
+        target_col = '주말'
+        
     # CSV 파일 읽기 (한글 깨짐 방지를 위해 cp949 혹은 utf-8-sig 확인 필요)
     try:
         df = pd.read_csv(file_path, encoding='utf-8')
@@ -23,16 +28,19 @@ def load_data():
         '대여점위도': 'lat',
         '대여점경도': 'lon',
         '대여 대여소명': 'name',
-        '주말': 'count'
+        target_col: 'count'
     })
     return df
 
 try:
-    data = load_data()
-
     # 사이드바 설정
     st.sidebar.header("설정")
+    mode = st.sidebar.radio("분석 데이터 선택", ["평일", "주말"])
     top_n = st.sidebar.slider("표시할 상위 대여소 개수", min_value=5, max_value=50, value=20)
+
+    data = load_data(mode)
+    
+    st.markdown(f"`{mode}` 데이터를 기반으로 이용량이 많은 대여소를 지도에 표시합니다.")
 
     # 데이터 정렬 및 추출
     top_df = data.sort_values(by='count', ascending=False).head(top_n)
@@ -63,7 +71,7 @@ try:
         st.pydeck_chart(pdk.Deck(
             layers=[layer],
             initial_view_state=view_state,
-            tooltip={"text": "{name}\n주말 이용건수: {count}"}
+            tooltip={"text": f"{{name}}\n{mode} 이용건수: {{count}}"}
         ))
 
     with col2:
@@ -79,9 +87,9 @@ try:
     s_col1, s_col2, s_col3 = st.columns(3)
     s_col1.metric("총 대여소 수", f"{len(data)}개")
     s_col2.metric("최고 이용 건수", f"{data['count'].max():,}건")
-    s_col3.metric("평균 주말 이용 건수", f"{int(data['count'].mean()):,}건")
+    s_col3.metric(f"평균 {mode} 이용 건수", f"{int(data['count'].mean()):,}건")
 
 except FileNotFoundError:
-    st.error(f"파일을 찾을 수 없습니다: weekendpopular.csv")
+    st.error(f"데이터 파일을 찾을 수 없습니다.")
 except Exception as e:
     st.error(f"오류가 발생했습니다: {e}")
